@@ -2,83 +2,138 @@
  * Tests for error handling utilities
  */
 
-import { describe, test, expect } from 'bun:test';
-import { handleApiError, handleDatabaseError, handleValidationError } from '../error-handler';
+import { describe, test, expect, mock, beforeEach } from 'bun:test';
+import { showErrorToast, getErrorMessage, withErrorHandling } from '../error-handler';
+
+// Mock the toast function
+const mockToast = mock(() => {});
+mock.module('@/hooks/use-toast', () => ({
+  toast: mockToast
+}));
 
 describe('Error Handler Utilities', () => {
-  describe('handleApiError', () => {
-    test('should format generic error', () => {
+  beforeEach(() => {
+    mockToast.mockClear();
+  });
+
+  describe('getErrorMessage', () => {
+    test('should extract message from Error object', () => {
       const error = new Error('Something went wrong');
-      const result = handleApiError(error);
+      const message = getErrorMessage(error);
       
-      expect(result.message).toBe('Something went wrong');
-      expect(result.status).toBe(500);
+      expect(message).toBe('Something went wrong');
     });
 
-    test('should handle error with status code', () => {
-      const error = new Error('Not found') as Error & { status?: number };
-      error.status = 404;
-      const result = handleApiError(error);
+    test('should handle string errors', () => {
+      const message = getErrorMessage('String error');
       
-      expect(result.message).toBe('Not found');
-      expect(result.status).toBe(404);
+      expect(message).toBe('String error');
     });
 
     test('should handle unknown error types', () => {
-      const result = handleApiError('string error');
+      const message = getErrorMessage({ unknown: 'object' });
       
-      expect(result.message).toBe('An unexpected error occurred');
-      expect(result.status).toBe(500);
+      expect(message).toBe('An unexpected error occurred');
+    });
+
+    test('should handle null and undefined', () => {
+      expect(getErrorMessage(null)).toBe('An unexpected error occurred');
+      expect(getErrorMessage(undefined)).toBe('An unexpected error occurred');
+    });
+
+    test('should handle number errors', () => {
+      const message = getErrorMessage(404);
+      
+      expect(message).toBe('An unexpected error occurred');
     });
   });
 
-  describe('handleDatabaseError', () => {
-    test('should format database constraint error', () => {
-      const error = new Error('UNIQUE constraint failed');
-      const result = handleDatabaseError(error);
+  describe('showErrorToast', () => {
+    test('should show toast with Error object', () => {
+      const error = new Error('Test error');
+      showErrorToast(error);
       
-      expect(result.message).toContain('constraint');
-      expect(result.status).toBe(400);
+      expect(mockToast).toHaveBeenCalled();
     });
 
-    test('should format foreign key error', () => {
-      const error = new Error('FOREIGN KEY constraint failed');
-      const result = handleDatabaseError(error);
+    test('should show toast with context', () => {
+      const error = new Error('Test error');
+      showErrorToast(error, 'Loading data');
       
-      expect(result.message).toContain('constraint');
-      expect(result.status).toBe(400);
+      expect(mockToast).toHaveBeenCalled();
     });
 
-    test('should handle generic database errors', () => {
-      const error = new Error('Database connection failed');
-      const result = handleDatabaseError(error);
+    test('should show toast with string error', () => {
+      showErrorToast('String error');
       
-      expect(result.message).toBe('Database connection failed');
-      expect(result.status).toBe(500);
+      expect(mockToast).toHaveBeenCalled();
+    });
+
+    test('should show toast with unknown error', () => {
+      showErrorToast({ unknown: 'error' });
+      
+      expect(mockToast).toHaveBeenCalled();
+    });
+
+    test('should log error to console', () => {
+      const consoleSpy = mock(() => {});
+      const originalError = console.error;
+      console.error = consoleSpy;
+      
+      const error = new Error('Test error');
+      showErrorToast(error, 'Test context');
+      
+      expect(consoleSpy).toHaveBeenCalled();
+      
+      console.error = originalError;
     });
   });
 
-  describe('handleValidationError', () => {
-    test('should format validation error with issues', () => {
-      const error = {
-        issues: [
-          { path: ['name'], message: 'Required' },
-          { path: ['email'], message: 'Invalid email' }
-        ]
+  describe('withErrorHandling', () => {
+    test('should wrap async function and handle success', async () => {
+      const fn = async (x: number) => x * 2;
+      const wrapped = withErrorHandling(fn, 'Test operation');
+      
+      const result = await wrapped(5);
+      expect(result).toBe(10);
+    });
+
+    test('should catch and re-throw errors', async () => {
+      const fn = async () => {
+        throw new Error('Test error');
       };
-      const result = handleValidationError(error);
+      const wrapped = withErrorHandling(fn, 'Test operation');
       
-      expect(result.message).toContain('name');
-      expect(result.message).toContain('Required');
-      expect(result.status).toBe(400);
+      try {
+        await wrapped();
+        expect(true).toBe(false); // Should not reach here
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        expect(mockToast).toHaveBeenCalled();
+      }
     });
 
-    test('should handle validation error without issues', () => {
-      const error = { message: 'Validation failed' };
-      const result = handleValidationError(error);
+    test('should preserve function arguments', async () => {
+      const fn = async (a: number, b: string, c: boolean) => {
+        return { a, b, c };
+      };
+      const wrapped = withErrorHandling(fn);
       
-      expect(result.message).toBe('Validation failed');
-      expect(result.status).toBe(400);
+      const result = await wrapped(42, 'test', true);
+      expect(result).toEqual({ a: 42, b: 'test', c: true });
+    });
+
+    test('should work without context', async () => {
+      const fn = async () => {
+        throw new Error('No context error');
+      };
+      const wrapped = withErrorHandling(fn);
+      
+      try {
+        await wrapped();
+      } catch (error) {
+        expect(mockToast).toHaveBeenCalled();
+      }
     });
   });
 });
