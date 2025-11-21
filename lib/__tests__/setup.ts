@@ -1,7 +1,11 @@
 /**
  * Test setup file
- * Mocks server-only module to allow testing of server-side code
+ * Configures test environment and mocks
  */
+
+// Set test environment
+process.env.NODE_ENV = 'test';
+process.env.BUN_ENV = 'test';
 
 // Mock the server-only module before any imports
 const Module = require('module');

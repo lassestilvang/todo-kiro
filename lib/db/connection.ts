@@ -2,29 +2,101 @@
 if (process.env.NODE_ENV !== 'test' && typeof window === 'undefined') {
   require('server-only');
 }
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
 
-let db: Database.Database | null = null;
+// Use bun:sqlite for tests, better-sqlite3 for production
+const isTest = process.env.NODE_ENV === 'test' || process.env.BUN_ENV === 'test';
+
+// Type for the underlying database (either bun:sqlite or better-sqlite3)
+interface UnderlyingDatabase {
+  query?: (sql: string) => {
+    all: (...params: unknown[]) => unknown[];
+    get: (...params: unknown[]) => unknown;
+    run: (...params: unknown[]) => void;
+  };
+  run?: (sql: string, ...params: unknown[]) => void;
+  close: () => void;
+  pragma?: (pragma: string) => void;
+}
+
+type DatabaseInstance = DatabaseAdapter | UnderlyingDatabase;
+
+let db: DatabaseInstance | null = null;
+
+// Adapter to make bun:sqlite compatible with better-sqlite3 API
+class DatabaseAdapter {
+  private db: UnderlyingDatabase;
+
+  constructor(db: UnderlyingDatabase) {
+    this.db = db;
+  }
+
+  prepare(sql: string) {
+    const stmt = this.db.query!(sql);
+    return {
+      all: (...params: unknown[]) => stmt.all(...params),
+      get: (...params: unknown[]) => stmt.get(...params),
+      run: (...params: unknown[]) => {
+        stmt.run(...params);
+        return { changes: this.db.query!('SELECT changes()').get() };
+      },
+    };
+  }
+
+  exec(sql: string) {
+    this.db.run!(sql);
+  }
+
+  pragma(pragma: string) {
+    this.db.run!(`PRAGMA ${pragma}`);
+  }
+
+  transaction(fn: () => void) {
+    return () => {
+      this.db.run!('BEGIN');
+      try {
+        fn();
+        this.db.run!('COMMIT');
+      } catch (error) {
+        this.db.run!('ROLLBACK');
+        throw error;
+      }
+    };
+  }
+
+  close() {
+    this.db.close();
+  }
+}
 
 /**
  * Get or create the database connection
  */
-export function getDatabase(): Database.Database {
+export function getDatabase(): DatabaseAdapter | UnderlyingDatabase {
   if (db) {
     return db;
   }
 
-  // Create database directory if it doesn't exist
-  const dbDir = path.join(process.cwd(), 'database');
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
-  }
+  if (isTest) {
+    // Use bun:sqlite for tests (in-memory)
+    const { Database: BunDatabase } = require('bun:sqlite');
+    const bunDb = new BunDatabase(':memory:');
+    db = new DatabaseAdapter(bunDb);
+  } else {
+    // Use better-sqlite3 for production
+    const Database = require('better-sqlite3');
+    const path = require('path');
+    const fs = require('fs');
 
-  // Create database connection
-  const dbPath = path.join(dbDir, 'tasks.db');
-  db = new Database(dbPath);
+    // Create database directory if it doesn't exist
+    const dbDir = path.join(process.cwd(), 'database');
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
+
+    // Create database connection
+    const dbPath = path.join(dbDir, 'tasks.db');
+    db = new Database(dbPath);
+  }
 
   // Enable foreign keys
   db.pragma('foreign_keys = ON');

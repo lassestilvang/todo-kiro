@@ -1,5 +1,9 @@
 # Daily Task Planner
 
+[![Tests](https://img.shields.io/badge/tests-257%20passing-brightgreen)](./docs/TESTING.md)
+[![Coverage](https://img.shields.io/badge/coverage-75%25-yellow)](./docs/TEST_COVERAGE_REPORT.md)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)](https://www.typescriptlang.org/)
+
 A modern, professional task management application built with Next.js 16, TypeScript, and SQLite. Organize your daily tasks with custom lists, labels, recurring patterns, and smart views.
 
 ## Features
@@ -42,8 +46,8 @@ A modern, professional task management application built with Next.js 16, TypeSc
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd daily-task-planner
+git clone https://github.com/lassestilvang/todo-kiro
+cd todo-kiro
 ```
 
 2. Install dependencies:

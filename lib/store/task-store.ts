@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { startOfDay, addDays, isAfter, isBefore, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
 import type { Task } from '@/types';
 import { showErrorToast } from '@/lib/utils/error-handler';
 
@@ -73,109 +73,7 @@ function taskToRow(task: Partial<Task>): Record<string, unknown> {
   return row;
 }
 
-// Helper function to create change log entries for task updates
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function createChangeLogEntries(taskId: string, oldTask: Task, updates: Partial<Task>): void {
-  const changes: Array<{
-    task_id: string;
-    field: string;
-    old_value: string | null;
-    new_value: string | null;
-  }> = [];
-
-  // Track changes for each field
-  if (updates.name !== undefined && updates.name !== oldTask.name) {
-    changes.push({
-      task_id: taskId,
-      field: 'name',
-      old_value: oldTask.name,
-      new_value: updates.name,
-    });
-  }
-
-  if (updates.description !== undefined && updates.description !== oldTask.description) {
-    changes.push({
-      task_id: taskId,
-      field: 'description',
-      old_value: oldTask.description,
-      new_value: updates.description,
-    });
-  }
-
-  if (updates.listId !== undefined && updates.listId !== oldTask.listId) {
-    changes.push({
-      task_id: taskId,
-      field: 'listId',
-      old_value: oldTask.listId,
-      new_value: updates.listId,
-    });
-  }
-
-  if (updates.date !== undefined) {
-    const oldDate = oldTask.date ? formatLocalDate(oldTask.date) : null;
-    const newDate = updates.date ? formatLocalDate(updates.date) : null;
-    if (oldDate !== newDate) {
-      changes.push({
-        task_id: taskId,
-        field: 'date',
-        old_value: oldDate ?? null,
-        new_value: newDate ?? null,
-      });
-    }
-  }
-
-  if (updates.deadline !== undefined) {
-    const oldDeadline = oldTask.deadline ? formatLocalDate(oldTask.deadline) : null;
-    const newDeadline = updates.deadline ? formatLocalDate(updates.deadline) : null;
-    if (oldDeadline !== newDeadline) {
-      changes.push({
-        task_id: taskId,
-        field: 'deadline',
-        old_value: oldDeadline ?? null,
-        new_value: newDeadline ?? null,
-      });
-    }
-  }
-
-  if (updates.estimatedTime !== undefined && updates.estimatedTime !== oldTask.estimatedTime) {
-    changes.push({
-      task_id: taskId,
-      field: 'estimatedTime',
-      old_value: oldTask.estimatedTime?.toString() ?? null,
-      new_value: updates.estimatedTime?.toString() ?? null,
-    });
-  }
-
-  if (updates.actualTime !== undefined && updates.actualTime !== oldTask.actualTime) {
-    changes.push({
-      task_id: taskId,
-      field: 'actualTime',
-      old_value: oldTask.actualTime?.toString() ?? null,
-      new_value: updates.actualTime?.toString() ?? null,
-    });
-  }
-
-  if (updates.priority !== undefined && updates.priority !== oldTask.priority) {
-    changes.push({
-      task_id: taskId,
-      field: 'priority',
-      old_value: oldTask.priority,
-      new_value: updates.priority,
-    });
-  }
-
-  if (updates.completed !== undefined && updates.completed !== oldTask.completed) {
-    changes.push({
-      task_id: taskId,
-      field: 'completed',
-      old_value: oldTask.completed.toString(),
-      new_value: updates.completed.toString(),
-    });
-  }
-
-  // Note: Change logs are created on the server side in the API route
-  // This function is kept for potential future use but does nothing now
-}
+// Note: Change logs are created on the server side in the API route
 
 interface TaskStore {
   tasks: Task[];
@@ -406,7 +304,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 
   // Get tasks by label ID
-  getTasksByLabel: (labelId) => {
+  getTasksByLabel: (_labelId) => {
     // Filter tasks that have the specified label
     // Note: This requires tasks to be loaded with label information
     // The label page should use loadTasksByLabel instead

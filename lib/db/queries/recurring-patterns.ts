@@ -8,7 +8,7 @@ export function getRecurringPattern(taskId: string): RecurringPatternRow | null 
   const db = getDatabase();
   const row = db
     .prepare('SELECT * FROM recurring_patterns WHERE task_id = ?')
-    .get(taskId) as any;
+    .get(taskId) as RecurringPatternRow | undefined;
   
   if (!row) return null;
 
