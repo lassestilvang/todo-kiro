@@ -6,58 +6,112 @@ if (process.env.NODE_ENV !== 'test' && typeof window === 'undefined') {
 // Use bun:sqlite for tests, better-sqlite3 for production
 const isTest = process.env.NODE_ENV === 'test' || process.env.BUN_ENV === 'test';
 
-// Type for the underlying database (either bun:sqlite or better-sqlite3)
-interface UnderlyingDatabase {
-  query?: (sql: string) => {
-    all: (...params: unknown[]) => unknown[];
-    get: (...params: unknown[]) => unknown;
-    run: (...params: unknown[]) => void;
+// Common database interface
+export interface DatabaseAdapter {
+  prepare(sql: string): {
+    all(...params: unknown[]): unknown[];
+    get(...params: unknown[]): unknown;
+    run(...params: unknown[]): { changes: unknown };
   };
-  run?: (sql: string, ...params: unknown[]) => void;
-  close: () => void;
-  pragma?: (pragma: string) => void;
+  exec(sql: string): void;
+  pragma(pragma: string): void;
+  transaction(fn: () => void): () => void;
+  close(): void;
 }
 
-type DatabaseInstance = DatabaseAdapter | UnderlyingDatabase;
+let db: DatabaseAdapter | null = null;
 
-let db: DatabaseInstance | null = null;
+// Adapter for bun:sqlite to match better-sqlite3 API
+class BunSqliteAdapter implements DatabaseAdapter {
+  private db: {
+    query: (sql: string) => {
+      all: (...params: unknown[]) => unknown[];
+      get: (...params: unknown[]) => unknown;
+      run: (...params: unknown[]) => void;
+    };
+    run: (sql: string, ...params: unknown[]) => void;
+    close: () => void;
+  };
 
-// Adapter to make bun:sqlite compatible with better-sqlite3 API
-class DatabaseAdapter {
-  private db: UnderlyingDatabase;
-
-  constructor(db: UnderlyingDatabase) {
-    this.db = db;
+  constructor(db: unknown) {
+    this.db = db as typeof this.db;
   }
 
   prepare(sql: string) {
-    const stmt = this.db.query!(sql);
+    const stmt = this.db.query(sql);
     return {
       all: (...params: unknown[]) => stmt.all(...params),
       get: (...params: unknown[]) => stmt.get(...params),
       run: (...params: unknown[]) => {
         stmt.run(...params);
-        return { changes: this.db.query!('SELECT changes()').get() };
+        return { changes: this.db.query('SELECT changes()').get() };
       },
     };
   }
 
   exec(sql: string) {
-    this.db.run!(sql);
+    this.db.run(sql);
   }
 
   pragma(pragma: string) {
-    this.db.run!(`PRAGMA ${pragma}`);
+    this.db.run(`PRAGMA ${pragma}`);
   }
 
   transaction(fn: () => void) {
     return () => {
-      this.db.run!('BEGIN');
+      this.db.run('BEGIN');
       try {
         fn();
-        this.db.run!('COMMIT');
+        this.db.run('COMMIT');
       } catch (error) {
-        this.db.run!('ROLLBACK');
+        this.db.run('ROLLBACK');
+        throw error;
+      }
+    };
+  }
+
+  close() {
+    this.db.close();
+  }
+}
+
+// Adapter for better-sqlite3 (it already matches our interface, just need to type it)
+class BetterSqlite3Adapter implements DatabaseAdapter {
+  private db: {
+    prepare: (sql: string) => {
+      all: (...params: unknown[]) => unknown[];
+      get: (...params: unknown[]) => unknown;
+      run: (...params: unknown[]) => { changes: number };
+    };
+    exec: (sql: string) => void;
+    pragma: (pragma: string) => void;
+    close: () => void;
+  };
+
+  constructor(db: unknown) {
+    this.db = db as typeof this.db;
+  }
+
+  prepare(sql: string) {
+    return this.db.prepare(sql);
+  }
+
+  exec(sql: string) {
+    this.db.exec(sql);
+  }
+
+  pragma(pragma: string) {
+    this.db.pragma(pragma);
+  }
+
+  transaction(fn: () => void) {
+    return () => {
+      this.db.exec('BEGIN');
+      try {
+        fn();
+        this.db.exec('COMMIT');
+      } catch (error) {
+        this.db.exec('ROLLBACK');
         throw error;
       }
     };
@@ -71,7 +125,7 @@ class DatabaseAdapter {
 /**
  * Get or create the database connection
  */
-export function getDatabase(): DatabaseAdapter | UnderlyingDatabase {
+export function getDatabase(): DatabaseAdapter {
   if (db) {
     return db;
   }
@@ -80,7 +134,7 @@ export function getDatabase(): DatabaseAdapter | UnderlyingDatabase {
     // Use bun:sqlite for tests (in-memory)
     const { Database: BunDatabase } = require('bun:sqlite');
     const bunDb = new BunDatabase(':memory:');
-    db = new DatabaseAdapter(bunDb);
+    db = new BunSqliteAdapter(bunDb);
   } else {
     // Use better-sqlite3 for production
     const Database = require('better-sqlite3');
@@ -95,13 +149,12 @@ export function getDatabase(): DatabaseAdapter | UnderlyingDatabase {
 
     // Create database connection
     const dbPath = path.join(dbDir, 'tasks.db');
-    db = new Database(dbPath);
+    const betterSqliteDb = new Database(dbPath);
+    db = new BetterSqlite3Adapter(betterSqliteDb);
   }
 
-  // Enable foreign keys
+  // Enable foreign keys and WAL mode
   db.pragma('foreign_keys = ON');
-
-  // Enable WAL mode for better concurrency
   db.pragma('journal_mode = WAL');
 
   return db;
@@ -121,21 +174,21 @@ export function closeDatabase(): void {
  * Reset the database (for testing)
  */
 export function resetDatabase(): void {
-  if (db) {
-    // Disable foreign keys temporarily
-    db.pragma('foreign_keys = OFF');
-    
-    // Get all table names
-    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[];
-    
-    // Drop all tables
-    for (const table of tables) {
-      db.exec(`DROP TABLE IF EXISTS ${table.name}`);
-    }
-    
-    // Re-enable foreign keys
-    db.pragma('foreign_keys = ON');
+  if (!db) return;
+
+  // Disable foreign keys temporarily
+  db.pragma('foreign_keys = OFF');
+  
+  // Get all table names
+  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[];
+  
+  // Drop all tables
+  for (const table of tables) {
+    db.exec(`DROP TABLE IF EXISTS ${table.name}`);
   }
+  
+  // Re-enable foreign keys
+  db.pragma('foreign_keys = ON');
 }
 
 /**

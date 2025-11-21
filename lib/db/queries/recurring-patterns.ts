@@ -12,12 +12,7 @@ export function getRecurringPattern(taskId: string): RecurringPatternRow | null 
   
   if (!row) return null;
 
-  // Convert Date objects to ISO strings for JSON serialization
-  return {
-    ...row,
-    created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
-    end_date: row.end_date instanceof Date ? row.end_date.toISOString() : row.end_date,
-  };
+  return row;
 }
 
 /**
