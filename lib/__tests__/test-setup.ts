@@ -5,7 +5,7 @@
 
 // Polyfill for relative URLs in Node.js environment
 if (typeof globalThis.location === 'undefined') {
-  (globalThis as any).location = {
+  (globalThis as Record<string, unknown>).location = {
     origin: 'http://localhost:3000',
     href: 'http://localhost:3000/',
     protocol: 'http:',

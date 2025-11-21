@@ -31,7 +31,7 @@ export const handlers = [
   }),
 
   http.post('*/api/tasks', async ({ request }) => {
-    const body = await request.json() as any;
+    const body = await request.json() as Record<string, unknown>;
     return HttpResponse.json({
       id: crypto.randomUUID(),
       name: body.task.name,
@@ -52,7 +52,7 @@ export const handlers = [
   }),
 
   http.patch('*/api/tasks/:id', async ({ params, request }) => {
-    const body = await request.json() as any;
+    const body = await request.json() as Record<string, unknown>;
     return HttpResponse.json({
       id: params.id,
       name: body.updates.name || 'Updated Task',
@@ -93,7 +93,7 @@ export const handlers = [
   }),
 
   http.post('*/api/lists', async ({ request }) => {
-    const body = await request.json() as any;
+    const body = await request.json() as Record<string, unknown>;
     return HttpResponse.json({
       id: crypto.randomUUID(),
       name: body.name,
@@ -107,7 +107,7 @@ export const handlers = [
   }),
 
   http.patch('*/api/lists/:id', async ({ params, request }) => {
-    const body = await request.json() as any;
+    const body = await request.json() as Record<string, unknown>;
     return HttpResponse.json({
       id: params.id,
       name: body.name || 'Updated List',
@@ -139,7 +139,7 @@ export const handlers = [
   }),
 
   http.post('*/api/labels', async ({ request }) => {
-    const body = await request.json() as any;
+    const body = await request.json() as Record<string, unknown>;
     return HttpResponse.json({
       id: crypto.randomUUID(),
       name: body.name,
@@ -151,7 +151,7 @@ export const handlers = [
   }),
 
   http.patch('*/api/labels/:id', async ({ params, request }) => {
-    const body = await request.json() as any;
+    const body = await request.json() as Record<string, unknown>;
     return HttpResponse.json({
       id: params.id,
       name: body.name || 'Updated Label',

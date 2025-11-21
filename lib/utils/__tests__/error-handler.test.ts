@@ -131,7 +131,7 @@ describe('Error Handler Utilities', () => {
       
       try {
         await wrapped();
-      } catch (error) {
+      } catch {
         expect(mockToast).toHaveBeenCalled();
       }
     });

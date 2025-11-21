@@ -19,7 +19,7 @@ describe('useReducedMotion Hook', () => {
         dispatchEvent: () => true
       });
 
-      global.matchMedia = mockMatchMedia as any;
+      global.matchMedia = mockMatchMedia as unknown as typeof matchMedia;
 
       const result = matchMedia('(prefers-reduced-motion: reduce)');
       expect(result.matches).toBe(true);
@@ -37,7 +37,7 @@ describe('useReducedMotion Hook', () => {
         dispatchEvent: () => true
       });
 
-      global.matchMedia = mockMatchMedia as any;
+      global.matchMedia = mockMatchMedia as unknown as typeof matchMedia;
 
       const result = matchMedia('(prefers-reduced-motion: reduce)');
       expect(result.matches).toBe(false);

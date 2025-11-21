@@ -2,7 +2,7 @@
  * Tests for useToast hook
  */
 
-import { describe, test, expect, beforeEach } from 'bun:test';
+import { describe, test, expect } from 'bun:test';
 import { toast, reducer } from '../use-toast';
 
 describe('Toast Hook', () => {

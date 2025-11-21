@@ -5,8 +5,6 @@
 import Database from 'better-sqlite3';
 import { runMigrations } from '../db/migrations';
 
-let testDbCounter = 0;
-
 /**
  * Create an isolated in-memory database for testing
  */

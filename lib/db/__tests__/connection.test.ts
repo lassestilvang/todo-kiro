@@ -35,8 +35,7 @@ describe('Database Connection', () => {
 
   describe('closeDatabase', () => {
     test('should close database connection', () => {
-      const db = getDatabase();
-      const wasOpen = db.open;
+      getDatabase();
       
       closeDatabase();
       

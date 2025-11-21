@@ -43,7 +43,7 @@ describe('Database Initialization', () => {
       
       // Query the database directly to verify inbox was created
       const db = getDatabase();
-      const inbox = db.prepare('SELECT * FROM lists WHERE is_default = 1').get() as any;
+      const inbox = db.prepare('SELECT * FROM lists WHERE is_default = 1').get() as Record<string, unknown> | undefined;
       
       expect(inbox).toBeDefined();
       if (inbox) {
@@ -105,7 +105,7 @@ describe('Database Initialization', () => {
       try {
         await initializeDatabase();
         expect(true).toBe(true);
-      } catch (error) {
+      } catch {
         // Should not reach here
         expect(false).toBe(true);
       }
